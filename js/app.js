@@ -6,12 +6,22 @@
         [0,4,8], [2,4,6] //Diagonal 
     ];
 
-    const state = {
-        isOsTurn: true,
-        boxesX: [],
-        boxesO: []
+    const WINNER_OPTIONS = {
+        player1: "player1",
+        player2: "player2",
+        tie: "tie",
+        undetermined : ""
     }
 
+    //Basic game state
+    const state = {
+        isPlayer1Turn: true,
+        player1Boxes: [],
+        player2Boxes: [],
+        winner: WINNER_OPTIONS.undetermined
+    }
+
+    //An object to group all game logic methods
     const logic = {
         startNewGame: function(){
             ui.displayGameState("board");
@@ -19,9 +29,9 @@
 
         handleTurn: function(boxIndex){
 
-            let checkedBoxes = (state.isOsTurn) ? state.boxesO : state.boxesX;
+            let checkedBoxes = (state.isPlayer1Turn) ? state.player1Boxes : state.player2Boxes;
 
-            checkedBoxes.push(boxIndex);
+            checkedBoxes.push(boxIndex);  
 
             if(checkedBoxes.length > 2){
 
@@ -41,30 +51,35 @@
 
                         if(matchesCount > 2){
                             console.log("WINNER");  
-                            this.resetGame();              
+                            state.winner = (state.isPlayer1Turn) ? WINNER_OPTIONS.player1 : WINNER_OPTIONS.player2;
+                            ui.displayGameState("win");           
                             return;
                         }
                     }
                 }
             }
 
-            state.isOsTurn = !state.isOsTurn;
+            if(state.player1Boxes.length + state.player2Boxes.length === 9){
+                console.log("TIE");  
+                state.winner = WINNER_OPTIONS.tie;
+                ui.displayGameState("win");      
+                return;
+            }
+
+            state.isPlayer1Turn = !state.isPlayer1Turn;
             ui.indicateTurn();
         },
 
-        resetGame: function(){
-            
-            ui.displayGameState("win");
-
-            state.isOsTurn = true;
-            state.boxesX = [];
-            state.boxesO = [];
-
-            ui.resetBoard();
-            
+        resetGame: function(){          
+            state.isPlayer1Turn = true;
+            state.player1Boxes = [];
+            state.player2Boxes = [];
+            state.winner = WINNER_OPTIONS.undetermined;
+            ui.resetBoard();            
         }
     }
 
+    //An object responsible for UI updates and handling player's input
     const ui = {
         
         init: function(){
@@ -72,23 +87,43 @@
             //Cache DOM references and attach event listeners
             this.screenStart = document.querySelector("#start");
             let startGameButton = this.screenStart.querySelector(".button");
-
-            startGameButton.addEventListener("click", (event)=>{
-                logic.startNewGame();
-            });
+            let playerNameField = this.screenStart.querySelector("#player1-name");
+            this.player1Name = "Player 1";
+            this.player2Name = "Computer";
+            
 
             this.screenBoard = document.querySelector("#board");            
             let boxList = this.screenBoard.querySelector(".boxes");
             this.boxes = boxList.querySelectorAll("li");
+            
+            this.player1 = this.screenBoard.querySelector("#player1");   
+            let player1NameTag = this.screenBoard.querySelector("#player1-name");  
+            this.player2 = this.screenBoard.querySelector("#player2"); 
+            let player2NameTag = this.screenBoard.querySelector("#player2-name");  
 
-            this.playerX = this.screenBoard.querySelector("#player1");   
-            this.playerO = this.screenBoard.querySelector("#player2");   
+            startGameButton.addEventListener("click", (event)=>{
+
+                if(playerNameField.value !== ""){
+                    this.player1Name = playerNameField.value;
+                }
+
+                player1NameTag.innerText = this.player1Name;
+                player2NameTag.innerText = this.player2Name;   
+                
+                logic.startNewGame();
+            });
 
             boxList.addEventListener("click", this.handleClick.bind(this));
             boxList.addEventListener("mouseover", this.handleHover);
             boxList.addEventListener("mouseout", this.handleHover);
 
             this.screenWin = document.querySelector("#finish");
+            this.screenWinMessageContainer = this.screenWin.querySelector(".message");
+            let newGameButton = this.screenWin.querySelector(".button");
+            newGameButton.addEventListener("click", (event)=>{
+                logic.resetGame();
+                ui.displayGameState("board");
+            });
 
             this.displayGameState("start");
             this.indicateTurn();
@@ -97,14 +132,11 @@
         handleClick: function(event){
 
             let box = event.target;
-            let playerImage = (state.isOsTurn) ? "o" : "x";
+            let playerClass = (state.isPlayer1Turn) ? "box-filled-1" : "box-filled-2";
 
-            if(!box.classList.contains("checked")){
-                box.classList.add("checked");
-                box.style.backgroundImage = "url(img/" + playerImage + ".svg)";
-
+            if(!box.classList.contains("box-filled-1") && !box.classList.contains("box-filled-2")){                
+                box.classList.add(playerClass);
                 let clickedIndex = Array.prototype.indexOf.call(this.boxes, box);
-
                 logic.handleTurn(clickedIndex);
             }            
         },
@@ -112,9 +144,9 @@
         handleHover: function(event){
 
             let box = event.target;
-            let playerImage = (state.isOsTurn) ? "o" : "x";
+            let playerImage = (state.isPlayer1Turn) ? "o" : "x";
 
-            if(!box.classList.contains("checked")){
+            if(!box.classList.contains("box-filled-1") && !box.classList.contains("box-filled-2")){
                 if(event.type === "mouseover") {
                     box.style.backgroundImage = "url(img/" + playerImage + ".svg)";
                 }else{
@@ -125,12 +157,12 @@
 
         indicateTurn: function(){
             
-            if(state.isOsTurn){
-                this.playerX.classList.add("active");
-                this.playerO.classList.remove("active");
+            if(state.isPlayer1Turn){
+                this.player1.classList.add("active");
+                this.player2.classList.remove("active");
             }else{
-                this.playerO.classList.add("active");
-                this.playerX.classList.remove("active");
+                this.player1.classList.remove("active");
+                this.player2.classList.add("active");
             }
         },
 
@@ -149,8 +181,20 @@
                 this.screenBoard.style.display = "none";
                 this.screenWin.style.display = "block";
 
-                let winnerClass = (state.isOsTurn) ? "screen-win-one" : "screen-win-two";
+                let winnerClass;
+                let winnerName;
                 
+                if(state.winner === WINNER_OPTIONS.player1){
+                    winnerClass = "screen-win-one";
+                    winnerName = this.player1Name + " wins!";
+                }else if(state.winner === WINNER_OPTIONS.player2){
+                   winnerClass = "screen-win-two";
+                   winnerName = this.player2Name + " wins!";
+                }else{
+                    winnerClass = "screen-win-tie";
+                    winnerName = "It's a tie!";
+                }
+                this.screenWinMessageContainer.innerText = winnerName;
                 this.screenWin.classList.remove("screen-win-one", "screen-win-two");
                 this.screenWin.classList.add(winnerClass);
             }
@@ -158,7 +202,7 @@
 
         resetBoard: function(){
             for(let i = 0; i < this.boxes.length; i++){
-                this.boxes[i].classList.remove("checked");
+                this.boxes[i].classList.remove("box-filled-1", "box-filled-2");
                 this.boxes[i].style.backgroundImage = "";
             }
 
