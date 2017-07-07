@@ -1,11 +1,13 @@
 !function(){
 
-    const WINNING_CONDITIONS = [
+    //All possible winning patterns
+    const WINNING_PATTERNS = [
         [0,1,2], [3,4,5], [6,7,8], //Horizontal 
         [0,3,6], [1,4,7], [2,5,8], //Vertical 
         [0,4,8], [2,4,6] //Diagonal 
     ];
 
+    //String constants to use in code
     const WINNER_OPTIONS = {
         player1: "player1",
         player2: "player2",
@@ -13,7 +15,7 @@
         undetermined : ""
     }
 
-    //Basic game state
+    //Basic game state model
     const state = {
         isPlayer1Turn: true,
         player1Boxes: [],
@@ -29,26 +31,29 @@
 
         handleTurnResults: function(boxIndex){
 
-            let checkedBoxes = (state.isPlayer1Turn) ? state.player1Boxes : state.player2Boxes;
+            //Setting which player is filling boxes
+            let filldBoxes = (state.isPlayer1Turn) ? state.player1Boxes : state.player2Boxes;
 
-            checkedBoxes.push(boxIndex);  
+            filldBoxes.push(boxIndex);  
 
-            if(checkedBoxes.length > 2){
+            //Checking if a winning or tie condition has been reached by matching all the boxes filled by players with predefined patterns
+            if(filldBoxes.length > 2){
 
-                for(let i = 0; i < WINNING_CONDITIONS.length; i++){
+                for(let i = 0; i < WINNING_PATTERNS.length; i++){
 
-                   let winningCondition = WINNING_CONDITIONS[i];
+                   let winningPattern = WINNING_PATTERNS[i];
 
                     let matchesCount = 0;
 
-                    for(let t = 0; t < checkedBoxes.length; t++){
+                    for(let t = 0; t < filldBoxes.length; t++){
                         
-                        let checkedBox = checkedBoxes[t];
+                        let filledBox = filldBoxes[t];
 
-                        if(winningCondition.indexOf(checkedBox) > -1){
+                        if(winningPattern.indexOf(filledBox) > -1){
                             matchesCount++;
                         }
 
+                        //If there are more than 2 matches with a winning pattern, the current player wins
                         if(matchesCount > 2){
                             state.winner = (state.isPlayer1Turn) ? WINNER_OPTIONS.player1 : WINNER_OPTIONS.player2;
                             ui.displayGameState("win");           
@@ -58,39 +63,108 @@
                 }
             }
 
+            //If no win has happended yet but all 9 boxes are filled, end the game with a tie
             if(state.player1Boxes.length + state.player2Boxes.length === 9){
                 state.winner = WINNER_OPTIONS.tie;
                 ui.displayGameState("win");      
                 return;
             }
 
+            //Alternate player turns in the logic and visually
             state.isPlayer1Turn = !state.isPlayer1Turn;
             ui.indicateTurn();
 
+            //After the player's turn run the AI player
             if(!state.isPlayer1Turn && state.winner === WINNER_OPTIONS.undetermined){
                 this.playAiTurn();
             }
-            
         },
+       
+        //All the AI logic is here.
 
+        //I haven't looked up existing Tic Tac Toe AI patterns for reference since I wanted to give it a shot myself
+        //TODO: add logic for the AI to prevent the user from winning. Currently it only cares about itself winning
         playAiTurn: function(){
 
+            //Give the AI logic a small timeout so that the game feels more natural
             let timeout = setTimeout(()=>{
-                let boxIndex = Math.floor(Math.random() * 8);  
+                
+                let boxIndex; //Holds the index of the box the AI ends up picking
+                
+                let possibleWinningCondition = {};
+                let isAiWinPossible = false;
 
-                while(state.player1Boxes.indexOf(boxIndex) > -1 || 
-                    state.player2Boxes.indexOf(boxIndex) > -1){ 
+                //Loop through all winning patterns
+                for(let i = 0; i < WINNING_PATTERNS.length; i++){
+                    
+                    let currentPatern = WINNING_PATTERNS[i];
 
-                    boxIndex = Math.floor(Math.random() * 8);
-                }                  
+                    let p1BoxesCount = 0,
+                        p2BoxesCount = 0;                  
+                    
+                    //Loop through each box in each pattern
+                    for(let t = 0; t < currentPatern.length; t++){
+                
+                        let boxIndexInPattern = currentPatern[t];
 
+                        //Count how many boxes in this pattern the user has already picked
+                        if(state.player1Boxes.indexOf(boxIndexInPattern) > -1){    
+                            p1BoxesCount+=1;
+                        }
+
+                        //Count how many boxes in this pattern the AI has already picked
+                        if(state.player2Boxes.indexOf(boxIndexInPattern) > -1){
+                            p2BoxesCount+=1;
+                        }                                           
+                    }            
+
+                    //isAiWinPossible is false by default but every time a pattern is found where the user has not yet touched, it is set to true
+                    if(p1BoxesCount === 0){
+                        isAiWinPossible = true;    
+                    }
+                    
+                    //Find 
+                    if(p1BoxesCount === 0 && 
+                       (possibleWinningCondition.p2BoxesCount <= p2BoxesCount || 
+                        typeof possibleWinningCondition.p2BoxesCount === 'undefined')  
+                    ) {
+                        possibleWinningCondition.pattern = currentPatern;
+                        possibleWinningCondition.p1BoxesCount = p1BoxesCount;
+                        possibleWinningCondition.p2BoxesCount = p2BoxesCount;
+                    } 
+                }               
+
+                //If there are no user Os in  the pattern, proceed with filling the boxes sequentially
+                if(isAiWinPossible){
+                    for(let k = 0; k < possibleWinningCondition.pattern.length; k++){
+
+                        let index = possibleWinningCondition.pattern[k];
+
+                        if(state.player2Boxes.indexOf(index) === -1){
+                            boxIndex = index;
+                            break;
+                        }
+                    }
+                }else{
+                    //As soon as there are no available winnable patterns, just try to randomly pick and fill the last available boxes
+                    boxIndex = Math.floor(Math.random() * 8);  
+
+                    while(state.player1Boxes.indexOf(boxIndex) > -1 || 
+                        state.player2Boxes.indexOf(boxIndex) > -1){ 
+
+                        boxIndex = Math.floor(Math.random() * 8);
+                    }     
+                }                
+
+                //Fill the box and check the results of the turn
                 ui.fillBox(boxIndex);
                 this.handleTurnResults(boxIndex);
 
                 clearTimeout(timeout);
-            },700);            
+            },500);            
         },
 
+        //Set everything to initial state
         resetGame: function(){          
             state.isPlayer1Turn = true;
             state.player1Boxes = [];
@@ -100,9 +174,10 @@
         }
     }
 
-    //An object responsible for UI updates and handling player's input
+    //All UI logic is here
     const ui = {
         
+        //Prepare what's needed for the game to run
         init: function(){
 
             //Cache DOM references and attach event listeners
@@ -110,8 +185,7 @@
             let startGameButton = this.screenStart.querySelector(".button");
             let playerNameField = this.screenStart.querySelector("#player1-name");
             this.player1Name = "Player 1";
-            this.player2Name = "Computer";
-            
+            this.player2Name = "Computer";            
 
             this.screenBoard = document.querySelector("#board");            
             let boxList = this.screenBoard.querySelector(".boxes");
@@ -141,6 +215,7 @@
             this.screenWin = document.querySelector("#finish");
             this.screenWinMessageContainer = this.screenWin.querySelector(".message");
             let newGameButton = this.screenWin.querySelector(".button");
+
             newGameButton.addEventListener("click", (event)=>{
                 logic.resetGame();
                 ui.displayGameState("board");
@@ -152,9 +227,11 @@
 
         handleClick: function(event){
 
-            if(state.isPlayer1Turn && state.winner === WINNER_OPTIONS.undetermined){
-                let box = event.target;
+            //Only allow to proceed if it's the player's turn
+            if(state.isPlayer1Turn && state.winner === WINNER_OPTIONS.undetermined){ 
+                let box = event.target; 
 
+                //Only allow filling empty boxes
                 if(!box.classList.contains("box-filled-1") && !box.classList.contains("box-filled-2")){                
                     let clickedIndex = Array.prototype.indexOf.call(this.boxes, box);
                     this.fillBox(clickedIndex);    
@@ -172,10 +249,12 @@
 
         handleHover: function(event){
 
+            //Only allow to proceed if it's the player's turn
             if(state.isPlayer1Turn && state.winner === WINNER_OPTIONS.undetermined){
                 let box = event.target;
                 let playerImage = (state.isPlayer1Turn) ? "o" : "x";
 
+                 //Only allow filling empty boxes
                 if(!box.classList.contains("box-filled-1") && !box.classList.contains("box-filled-2")){
                     if(event.type === "mouseover") {
                         box.style.backgroundImage = "url(img/" + playerImage + ".svg)";
@@ -186,8 +265,7 @@
             }         
         },
 
-        indicateTurn: function(){
-            
+        indicateTurn: function(){          
             if(state.isPlayer1Turn){
                 this.player1.classList.add("active");
                 this.player2.classList.remove("active");
@@ -197,6 +275,7 @@
             }
         },
 
+        //Managing transitions between screens 
         displayGameState: function(gameState){
 
             let timeout;
@@ -210,6 +289,7 @@
                 this.screenBoard.style.display = "block";
                 this.screenWin.style.display = "none";
             }else{
+                //Adding a slight delay before the win screen appears so that the user has a bit of time to review the board
                 timeout = setTimeout(()=>{
                     this.screenStart.style.display = "none";
                     this.screenBoard.style.display = "none";
@@ -226,21 +306,18 @@
                     winnerName = this.player2Name + " wins!";
                     }else{
                         winnerClass = "screen-win-tie";
-                        winnerName = "It's a tie!";
+                        winnerName = "It's a Tie!";
                     }
                     this.screenWinMessageContainer.innerText = winnerName;
-                    this.screenWin.classList.remove("screen-win-one", "screen-win-two");
+                    this.screenWin.classList.remove("screen-win-one", "screen-win-two", "screen-win-tie");
                     this.screenWin.classList.add(winnerClass);
                     
                     clearTimeout(timeout);
-                }, 1000);
-
-                
-
-
+                }, 1000);               
             }
         },
 
+        //Reset board visuals
         resetBoard: function(){
             for(let i = 0; i < this.boxes.length; i++){
                 this.boxes[i].classList.remove("box-filled-1", "box-filled-2");
@@ -254,9 +331,6 @@
     //Run the initial setup when the DOM is ready
     document.addEventListener("DOMContentLoaded", function(event) {
         ui.init();
-    });
+    }); 
     
-
-    
-
 }();
