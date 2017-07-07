@@ -27,7 +27,7 @@
             ui.displayGameState("board");
         },
 
-        handleTurn: function(boxIndex){
+        handleTurnResults: function(boxIndex){
 
             let checkedBoxes = (state.isPlayer1Turn) ? state.player1Boxes : state.player2Boxes;
 
@@ -50,7 +50,6 @@
                         }
 
                         if(matchesCount > 2){
-                            console.log("WINNER");  
                             state.winner = (state.isPlayer1Turn) ? WINNER_OPTIONS.player1 : WINNER_OPTIONS.player2;
                             ui.displayGameState("win");           
                             return;
@@ -60,7 +59,6 @@
             }
 
             if(state.player1Boxes.length + state.player2Boxes.length === 9){
-                console.log("TIE");  
                 state.winner = WINNER_OPTIONS.tie;
                 ui.displayGameState("win");      
                 return;
@@ -68,6 +66,29 @@
 
             state.isPlayer1Turn = !state.isPlayer1Turn;
             ui.indicateTurn();
+
+            if(!state.isPlayer1Turn && state.winner === WINNER_OPTIONS.undetermined){
+                this.playAiTurn();
+            }
+            
+        },
+
+        playAiTurn: function(){
+
+            let timeout = setTimeout(()=>{
+                let boxIndex = Math.floor(Math.random() * 8);  
+
+                while(state.player1Boxes.indexOf(boxIndex) > -1 || 
+                    state.player2Boxes.indexOf(boxIndex) > -1){ 
+
+                    boxIndex = Math.floor(Math.random() * 8);
+                }                  
+
+                ui.fillBox(boxIndex);
+                this.handleTurnResults(boxIndex);
+
+                clearTimeout(timeout);
+            },700);            
         },
 
         resetGame: function(){          
@@ -131,28 +152,38 @@
 
         handleClick: function(event){
 
-            let box = event.target;
-            let playerClass = (state.isPlayer1Turn) ? "box-filled-1" : "box-filled-2";
+            if(state.isPlayer1Turn && state.winner === WINNER_OPTIONS.undetermined){
+                let box = event.target;
 
-            if(!box.classList.contains("box-filled-1") && !box.classList.contains("box-filled-2")){                
-                box.classList.add(playerClass);
-                let clickedIndex = Array.prototype.indexOf.call(this.boxes, box);
-                logic.handleTurn(clickedIndex);
-            }            
+                if(!box.classList.contains("box-filled-1") && !box.classList.contains("box-filled-2")){                
+                    let clickedIndex = Array.prototype.indexOf.call(this.boxes, box);
+                    this.fillBox(clickedIndex);    
+                    logic.handleTurnResults(clickedIndex);                                     
+                }                 
+            }
+                      
+        },
+
+        fillBox: function(boxIndex){
+            let box = this.boxes[boxIndex];
+            let playerClass = (state.isPlayer1Turn) ? "box-filled-1" : "box-filled-2";
+            box.classList.add(playerClass);
         },
 
         handleHover: function(event){
 
-            let box = event.target;
-            let playerImage = (state.isPlayer1Turn) ? "o" : "x";
+            if(state.isPlayer1Turn && state.winner === WINNER_OPTIONS.undetermined){
+                let box = event.target;
+                let playerImage = (state.isPlayer1Turn) ? "o" : "x";
 
-            if(!box.classList.contains("box-filled-1") && !box.classList.contains("box-filled-2")){
-                if(event.type === "mouseover") {
-                    box.style.backgroundImage = "url(img/" + playerImage + ".svg)";
-                }else{
-                    box.style.backgroundImage = "";
-                }
-            }            
+                if(!box.classList.contains("box-filled-1") && !box.classList.contains("box-filled-2")){
+                    if(event.type === "mouseover") {
+                        box.style.backgroundImage = "url(img/" + playerImage + ".svg)";
+                    }else{
+                        box.style.backgroundImage = "";
+                    }
+                }  
+            }         
         },
 
         indicateTurn: function(){
@@ -168,6 +199,8 @@
 
         displayGameState: function(gameState){
 
+            let timeout;
+
             if(gameState === "start"){
                 this.screenStart.style.display = "block";
                 this.screenBoard.style.display = "none";
@@ -177,26 +210,34 @@
                 this.screenBoard.style.display = "block";
                 this.screenWin.style.display = "none";
             }else{
-                this.screenStart.style.display = "none";
-                this.screenBoard.style.display = "none";
-                this.screenWin.style.display = "block";
+                timeout = setTimeout(()=>{
+                    this.screenStart.style.display = "none";
+                    this.screenBoard.style.display = "none";
+                    this.screenWin.style.display = "block";
 
-                let winnerClass;
-                let winnerName;
+                    let winnerClass;
+                    let winnerName;
+                    
+                    if(state.winner === WINNER_OPTIONS.player1){
+                        winnerClass = "screen-win-one";
+                        winnerName = this.player1Name + " wins!";
+                    }else if(state.winner === WINNER_OPTIONS.player2){
+                    winnerClass = "screen-win-two";
+                    winnerName = this.player2Name + " wins!";
+                    }else{
+                        winnerClass = "screen-win-tie";
+                        winnerName = "It's a tie!";
+                    }
+                    this.screenWinMessageContainer.innerText = winnerName;
+                    this.screenWin.classList.remove("screen-win-one", "screen-win-two");
+                    this.screenWin.classList.add(winnerClass);
+                    
+                    clearTimeout(timeout);
+                }, 1000);
+
                 
-                if(state.winner === WINNER_OPTIONS.player1){
-                    winnerClass = "screen-win-one";
-                    winnerName = this.player1Name + " wins!";
-                }else if(state.winner === WINNER_OPTIONS.player2){
-                   winnerClass = "screen-win-two";
-                   winnerName = this.player2Name + " wins!";
-                }else{
-                    winnerClass = "screen-win-tie";
-                    winnerName = "It's a tie!";
-                }
-                this.screenWinMessageContainer.innerText = winnerName;
-                this.screenWin.classList.remove("screen-win-one", "screen-win-two");
-                this.screenWin.classList.add(winnerClass);
+
+
             }
         },
 
